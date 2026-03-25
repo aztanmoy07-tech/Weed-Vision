@@ -1,4 +1,4 @@
-Here’s a clean, professional GitHub README version without symbols:
+
 
 ---
 
