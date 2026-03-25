@@ -1,8 +1,8 @@
-from ultralytics import YOLO
+from ultralytics import yolo
 import cv2
 
 # Load YOLO model (use pretrained or your trained one)
-model = YOLO("yolov8n.pt")  
+model = yolo("yolov8n.pt")  
 
 def detect_weeds(image_path):
     image = cv2.imread(image_path)
