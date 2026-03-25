@@ -1,11 +1,3 @@
-st.markdown("""
-<h1 style='text-align: center; color: #2e7d32; font-size: 48px;'>
-🌿 WeedVision
-</h1>
-<p style='text-align: center; font-size:18px; color: gray;'>
-Smart Weed Detection for Precision Agriculture
-</p>
-""", unsafe_allow_html=True)
 
 import streamlit as st
 import cv2
@@ -35,8 +27,14 @@ h1, h2, h3 {
 </style>
 """, unsafe_allow_html=True)
 # ---------------- TITLE ----------------
-st.title("🌿 WeedVision AI Dashboard")
-st.markdown("Smart Weed Detection for Precision Agriculture")
+st.markdown("""
+<h1 style='text-align: center; color: #2e7d32; font-size: 48px;'>
+🌿 WeedVision
+</h1>
+<p style='text-align: center; font-size:18px; color: gray;'>
+Smart Weed Detection for Precision Agriculture
+</p>
+""", unsafe_allow_html=True)
 
 # ---------------- FILE UPLOAD ----------------
 uploaded_file = st.file_uploader("📤 Upload Field Image", type=["jpg", "png"])
