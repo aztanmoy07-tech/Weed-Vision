@@ -6,7 +6,7 @@ import numpy as np
 
 # Safe import (prevents crash if file missing)
 try:
-    from inference import detect_weeds
+    from Yolo_inference import detect_weeds
 except:
     st.error("yolo_inference.py file is missing!")
     st.stop()
