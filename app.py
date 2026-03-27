@@ -8,7 +8,8 @@ app = Flask(__name__)
 app.secret_key = "super_secret_key"
 
 UPLOAD_FOLDER = "static/uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # ---------------- GOOGLE AUTH ----------------
 oauth = OAuth(app)
