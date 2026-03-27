@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WeedVision</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    🌿 WeedVision
+    <span style="float:right;">
+        {{ user.name if user else "" }}
+        <a href="/logout" style="color:white; margin-left:10px;">Logout</a>
+    </span>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+    <h1>Smart Weed Detection</h1>
+    <p>Computer Vision + AI for Precision Agriculture</p>
+</div>
+
+<!-- UPLOAD FORM -->
+<div class="container">
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" required>
+        <button type="submit">Detect</button>
+    </form>
+</div>
+
+{% if result %}
+
+<!-- IMAGE DISPLAY -->
+<div class="images">
+    <div>
+        <h3>Input</h3>
+        <img src="{{ input_image }}" alt="Input Image">
+    </div>
+
+    <div>
+        <h3>Output</h3>
+        <img src="{{ result.output }}" alt="Output Image">
+    </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+    <div class="card">
+        <h3>🌿 Weed Count</h3>
+        <p>{{ result.weed_count }}</p>
+    </div>
+
+    <div class="card">
+        <h3>🎯 Confidence</h3>
+        <p>{{ result.confidence }}%</p>
+    </div>
+
+    <div class="card">
+        <h3>📊 Status</h3>
+        <p>{{ result.status }}</p>
+    </div>
+</div>
+
+<!-- CHART -->
+return render_template(
+    "index.html",
+    result=result,
+    input_image=input_image,
+    user=session.get("user")
+)
+</body>
+</html>

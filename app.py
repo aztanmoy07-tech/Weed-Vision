@@ -1,115 +1,76 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+from authlib.integrations.flask_client import OAuth
+import os
+import cv2
+from yolo_inference import detect_weeds
 
-import streamtlit as st
-import tempfile
-import pandas as pd
-import numpy as np
+app = Flask(__name__)
+app.secret_key = "super_secret_key"
 
-# Safe import (prevents crash if file missing)
-try:
-    from yolo_inference import detect_weeds
-except:
-    st.error("yolo_inference.py file is missing!")
-    st.stop()
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="WeedVision", layout="wide")
+# ---------------- GOOGLE AUTH ----------------
+oauth = OAuth(app)
 
-# ---------------- STYLING ----------------
-st.markdown("""
-<style>
-body {
-    background-color: #f5f7fa;
-}
-h1, h2, h3 {
-    font-family: 'Roboto', sans-serif;
-}
-.stButton>button {
-    background-color: #2e7d32;
-    color: white;
-    border-radius: 8px;
-}
-</style>
-""", unsafe_allow_html=True)
+google = oauth.register(
+    name='google',
+    client_id="Y1061747286337-a3qbifl0sctkksj1l9eft8ls0vda3vtm.apps.googleusercontent.com",
+    client_secret="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",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
 
-# ---------------- TITLE ----------------
-st.markdown("""
-<h1 style='text-align: center; color: #2e7d32; font-size: 48px;'>
-🌿 WeedVision
-</h1>
-<p style='text-align: center; font-size:18px; color: gray;'>
-Smart Weed Detection for Precision Agriculture
-</p>
-""", unsafe_allow_html=True)
+@app.route("/login")
+def login():
+    return google.authorize_redirect(url_for("callback", _external=True))
 
-st.markdown("---")
+@app.route("/callback")
+def callback():
+    token = google.authorize_access_token()
+    user = token["userinfo"]
+    session["user"] = user
+    return redirect("/")
 
-# ---------------- FILE UPLOAD ----------------
-uploaded_file = st.file_uploader("📤 Upload Field Image", type=["jpg", "png"])
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect("/")
 
-if uploaded_file:
+# ---------------- MAIN APP ----------------
+@app.route("/", methods=["GET", "POST"])
+def index():
 
-    # Save uploaded file temporarily
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    temp_file.write(uploaded_file.read())
+    if "user" not in session:
+        return render_template("login.html")
 
-    col1, col2 = st.columns(2)
+    result = None
+    input_image = None
 
-    with col1:
-        st.subheader("📷 Input Image")
-        st.image(uploaded_file)
+    if request.method == "POST":
+        file = request.files.get("image")
 
-    # ---------------- DETECTION ----------------
-    try:
-        image, weed_count, confidence = detect_weeds(temp_file.name)
-    except Exception as e:
-        st.error(f"Detection Error: {e}")
-        st.stop()
+        if file:
+            filepath = os.path.join("static/uploads", file.filename)
+            file.save(filepath)
 
-    with col2:
-        st.subheader("✅ Detection Output")
-        st.image(image, channels="BGR")
+            image, weed_count, confidence = detect_weeds(filepath)
 
-    # ---------------- METRICS ----------------
-    st.markdown("## 📊 Dashboard")
+            output_path = "static/uploads/output.jpg"
+            cv2.imwrite(output_path, image)
 
-    col3, col4, col5 = st.columns(3)
+            result = {
+                "weed_count": weed_count,
+                "confidence": confidence,
+                "status": "High" if weed_count > 15 else "Moderate" if weed_count > 5 else "Low",
+                "output": output_path
+            }
 
-    col3.metric("🌿 Weed Count", weed_count)
-    col4.metric("🎯 Avg Confidence (%)", confidence)
-    col5.metric("📍 Status", "Weeds Detected" if weed_count > 0 else "Clean Field")
+            input_image = filepath
 
-    # ---------------- CHART ----------------
-    st.markdown("### 🌱 Weed vs Crop Distribution")
-
-    total_area = 30  # assumed field segments for visualization
-    crop_count = max(0, total_area - weed_count)
-
-    data = pd.DataFrame({
-        "Category": ["Weed", "Crop"],
-        "Count": [weed_count, crop_count]
-    })
-
-    st.bar_chart(data.set_index("Category"))
-
-    # ---------------- TREND ----------------
-    st.markdown("### 📈 Confidence Trend")
-
-    trend = pd.DataFrame({
-        "Frame": list(range(1, 11)),
-        "Confidence": np.linspace(max(60, confidence - 10), confidence, 10)
-    })
-
-    st.line_chart(trend.set_index("Frame"))
-
-    # ---------------- INSIGHTS ----------------
-    st.markdown("### 🧠 Insights")
-
-    if weed_count > 15:
-        st.error("High weed density detected! Immediate action required.")
-    elif weed_count > 5:
-        st.warning("Moderate weed presence detected.")
-    else:
-        st.success("Low weed presence. Field is mostly clean.")
-
-else:
-    st.info("👆 Upload an image to start detection")
+    return render_template(
+        "index.html",
+        result=result,
+        input_image=input_image,
+        user=session.get("user")
+    )

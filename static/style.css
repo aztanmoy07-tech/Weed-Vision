@@ -1,0 +1,38 @@
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #f5f7fa;
+}
+
+.navbar {
+    background: #2e7d32;
+    color: white;
+    padding: 15px;
+}
+
+button {
+    background: #2e7d32;
+    color: white;
+    padding: 10px;
+}
+
+.images {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.images img {
+    width: 300px;
+}
+
+.dashboard {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+}
