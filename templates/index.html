@@ -11,16 +11,17 @@
 <!-- NAVBAR -->
 <div class="navbar">
     🌿 WeedVision
-    <span style="float:right;">
-        {{ user.name if user else "" }}
-        <a href="/logout" style="color:white; margin-left:10px;">Logout</a>
-    </span>
-</div>
 
-<!-- HERO -->
-<div class="hero">
-    <h1>Smart Weed Detection</h1>
-    <p>Computer Vision + AI for Precision Agriculture</p>
+    <div>
+        {% if user %}
+            👤 {{ user.name }}
+            <a href="/logout" style="margin-left:10px; color:white;">Logout</a>
+        {% else %}
+            <a href="/login">
+                <button style="padding:6px 10px;">Login</button>
+            </a>
+        {% endif %}
+    </div>
 </div>
 
 <!-- UPLOAD FORM -->

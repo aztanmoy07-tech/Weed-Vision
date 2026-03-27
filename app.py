@@ -1,8 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from authlib.integrations.flask_client import OAuth
 import os
+
+client_id = os.environ.get("GOOGLE_CLIENT_ID")
+client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
 import cv2
 from yolo_inference import detect_weeds
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
@@ -13,15 +18,13 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # ---------------- GOOGLE AUTH ----------------
 oauth = OAuth(app)
-
 google = oauth.register(
     name='google',
-    client_id="Y1061747286337-a3qbifl0sctkksj1l9eft8ls0vda3vtm.apps.googleusercontent.com",
-    client_secret="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",
+    client_id=client_id,
+    client_secret=client_secret,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
 )
-
 @app.route("/login")
 def login():
     return google.authorize_redirect(url_for("callback", _external=True))
@@ -41,9 +44,6 @@ def logout():
 # ---------------- MAIN APP ----------------
 @app.route("/", methods=["GET", "POST"])
 def index():
-
-    if "user" not in session:
-        return render_template("login.html")
 
     result = None
     input_image = None
@@ -68,13 +68,13 @@ def index():
             }
 
             input_image = filepath
-
     return render_template(
-        "index.html",
-        result=result,
-        input_image=input_image,
-        user=session.get("user")
-    )
+    "index.html",
+    result=result,
+    input_image=input_image,
+    user=session.get("user")
+)
+
 if __name__ == "__main__":
     print("Starting Flask server...")
     app.run(host="127.0.0.1", port=5000, debug=True)

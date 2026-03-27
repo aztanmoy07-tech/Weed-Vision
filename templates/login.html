@@ -1,15 +1,47 @@
 <!DOCTYPE html>
 <html>
-<body style="text-align:center; margin-top:100px;">
+<head>
+    <title>Login - WeedVision</title>
 
-<h1>🌿 WeedVision</h1>
-<p>Login to continue</p>
+    <style>
+        body {
+            margin: 0;
+            background: #0b1120;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
 
-<a href="/login">
-<button style="padding:10px; background:#2e7d32; color:white;">
-Login with Google
-</button>
-</a>
+        .login-box {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        button {
+            background: #22c55e;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="login-box">
+    <h1>🌿 WeedVision</h1>
+    <p>Login to continue</p>
+
+    <a href="/login">
+        <button>Login with Google</button>
+    </a>
+</div>
 
 </body>
 </html>
