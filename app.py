@@ -1,8 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
-import os
+import os, uuid, time
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
-import uuid
 import cv2
 import numpy as np
 
@@ -40,13 +39,12 @@ google = oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-# ---------------- REAL DETECTION FUNCTION ----------------
+# ---------------- DETECTION FUNCTION ----------------
 def detect_weeds(image_path):
     try:
         import math
 
         img = cv2.imread(image_path)
-
         if img is None:
             return 0, None, None
 
@@ -57,7 +55,7 @@ def detect_weeds(image_path):
 
         mask = cv2.inRange(hsv, lower_green, upper_green)
 
-        # 🔥 BETTER NOISE HANDLING
+        # noise reduction
         kernel = np.ones((7, 7), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
@@ -70,29 +68,24 @@ def detect_weeds(image_path):
         for c in contours:
             area = cv2.contourArea(c)
 
-            # ❌ IGNORE MAIN PLANT
-            if area > 7000:
+            # ❌ ignore main crop (dynamic)
+            if area > (img.shape[0] * img.shape[1]) * 0.1:
                 continue
 
-            # ❌ IGNORE SMALL NOISE
+            # ❌ ignore noise
             if area < 1200:
                 continue
 
             x, y, w, h = cv2.boundingRect(c)
 
-            # 🔥 MERGE CLOSE CONTOURS (KEY FIX)
             merged = False
             for i, (mx, my, mw, mh) in enumerate(weed_boxes):
-
-                cx1 = x + w // 2
-                cy1 = y + h // 2
-
-                cx2 = mx + mw // 2
-                cy2 = my + mh // 2
+                cx1, cy1 = x + w//2, y + h//2
+                cx2, cy2 = mx + mw//2, my + mh//2
 
                 dist = math.hypot(cx1 - cx2, cy1 - cy2)
 
-                if dist < 80:   # 🔥 adjust if needed
+                if dist < 80:
                     nx = min(x, mx)
                     ny = min(y, my)
                     nw = max(x+w, mx+mw) - nx
@@ -105,18 +98,18 @@ def detect_weeds(image_path):
             if not merged:
                 weed_boxes.append((x, y, w, h))
 
-        # 🔥 FINAL COUNT
         weed_count = len(weed_boxes)
 
-        # 🔥 DRAW ONLY FINAL BOXES
+        # draw boxes
         for (x, y, w, h) in weed_boxes:
             cv2.rectangle(output_img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-        # 🔥 MASK IMAGE
-        mask_colored = cv2.bitwise_and(img, img, mask=mask)
+        # ✅ FIXED PATH HANDLING
+        name, ext = os.path.splitext(image_path)
+        mask_path = name + "_mask" + ext
+        output_path = name + "_box" + ext
 
-        mask_path = image_path.replace(".", "_mask.")
-        output_path = image_path.replace(".", "_box.")
+        mask_colored = cv2.bitwise_and(img, img, mask=mask)
 
         cv2.imwrite(mask_path, mask_colored)
         cv2.imwrite(output_path, output_img)
@@ -126,8 +119,9 @@ def detect_weeds(image_path):
     except Exception as e:
         print("Detection error:", e)
         return 0, None, None
-# ---------------- ROUTES ----------------
 
+
+# ---------------- ROUTES ----------------
 @app.route("/", methods=["GET", "POST"])
 def index():
 
@@ -135,14 +129,13 @@ def index():
 
     result = None
     input_image = None
+    error = None
 
     weed_count = 0
     confidence = 0
-    output_path = None
     health = 100
     density = 0
 
-    # 🌍 DEFAULT GPS (India center)
     lat = 20.5937
     lng = 78.9629
 
@@ -150,88 +143,88 @@ def index():
 
         file = request.files.get("image")
 
-        # ✅ FILE CHECK
+        # ❌ FILE CHECK
         if not file or file.filename == "":
-            return render_template(
-                "index.html",
-                result=None,
-                input_image=None,
-                user=session.get("user"),
-                history=history
-            )
+            error = "Please upload an image"
+        elif not allowed_file(file.filename):
+            error = "Only JPG/PNG allowed"
 
-        # ✅ FILE TYPE CHECK
-        if not allowed_file(file.filename):
-            return render_template(
-                "index.html",
-                result=None,
-                input_image=None,
-                user=session.get("user"),
-                history=history
-            )
+        else:
+            # 🌍 GPS
+            try:
+                lat = float(request.form.get("lat"))
+                lng = float(request.form.get("lng"))
+            except:
+                pass
 
-        # 🌍 GET GPS FROM FORM
-        lat_input = request.form.get("lat")
-        lng_input = request.form.get("lng")
+            # save file
+            filename = str(uuid.uuid4()) + "_" + file.filename
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(filepath)
 
-        try:
-            lat = float(lat_input)
-            lng = float(lng_input)
-        except:
-            lat = 20.5937
-            lng = 78.9629
+            input_image = filepath
 
-        # ✅ UNIQUE FILE NAME
-        filename = str(uuid.uuid4()) + "_" + file.filename
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+            # 🔥 DETECTION
+            weed_count, mask_path, boxed_path = detect_weeds(filepath)
 
-        input_image = filepath
+            # 📊 METRICS
+            density = min(100, weed_count * 4)
+            health = max(0, 100 - density)
 
-        # ✅ REAL DETECTION
-        weed_count, mask_path, boxed_path = detect_weeds(filepath)
-        # ✅ CONFIDENCE LOGIC
-        confidence = min(95, max(60, weed_count * 3))
+            confidence = min(95, max(65, int(100 - (density * 0.5))))
 
-        # ✅ METRICS
-        density = min(100, weed_count * 4)
-        health = max(0, 100 - density)
+            # 📊 STATUS
+            if density > 70:
+                status = "Critical"
+            elif density > 40:
+                status = "High"
+            elif density > 15:
+                status = "Moderate"
+            else:
+                status = "Low"
 
-        output_path = filepath
+            result = {
+                "weed_count": weed_count,
+                "confidence": confidence,
+                "status": status,
+                "output": boxed_path,
+                "mask": mask_path,
+                "recommendation": "Spray immediately" if density > 40 else "Monitor field",
+                "health": health,
+                "density": density,
+                "lat": lat,
+                "lng": lng
+            }
 
-        result = {
-    "weed_count": weed_count,
-    "confidence": confidence,
-    "status": "High" if weed_count > 15 else "Moderate" if weed_count > 5 else "Low",
-    "output": boxed_path,   # 🔥 SHOW BOXED IMAGE
-    "mask": mask_path,
-    "recommendation": "Spray immediately" if weed_count > 15 else "Monitor field",
-    "health": health,
-    "density": density,
-    "lat": lat,
-    "lng": lng
-}
+            # 📜 HISTORY
+            history.append({
+                "weed_count": weed_count,
+                "status": status,
+                "lat": lat,
+                "lng": lng
+            })
 
-        # ✅ HISTORY UPDATE
-        history.append({
-            "weed_count": weed_count,
-            "status": result["status"]
-        })
+            if len(history) > 20:
+                history.pop(0)
 
-        if len(history) > 20:
-            history.pop(0)
+            # 🧹 CLEAN OLD FILES
+            for f in os.listdir(UPLOAD_FOLDER):
+                path = os.path.join(UPLOAD_FOLDER, f)
+                if os.path.isfile(path):
+                    if time.time() - os.path.getmtime(path) > 86400:
+                        os.remove(path)
 
     return render_template(
         "index.html",
         result=result,
         input_image=input_image,
         user=session.get("user"),
-        history=history
+        history=history,
+        error=error
     )
 
 
 # ---------------- LOGIN ----------------
-
 @app.route("/login")
 def login():
     return google.authorize_redirect(url_for("callback", _external=True))
@@ -240,8 +233,7 @@ def login():
 @app.route("/callback")
 def callback():
     token = google.authorize_access_token()
-    user = token["userinfo"]
-    session["user"] = user
+    session["user"] = token["userinfo"]
     return redirect("/")
 
 

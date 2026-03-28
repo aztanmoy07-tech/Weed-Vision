@@ -2,56 +2,25 @@
 <html>
 <head>
     <title>WeedVision</title>
+
+    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <!-- Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-    <style>
-        .upload-box {
-            border: 2px dashed #4CAF50;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            background: #f9fff9;
-            cursor: pointer;
-        }
-
-        .upload-box input { display: none; }
-
-        .detect-btn {
-            margin-top: 10px;
-            padding: 10px 20px;
-            background: green;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-
-        #preview {
-            max-width: 200px;
-            margin-top: 10px;
-            display: none;
-        }
-
-        #loading {
-            display: none;
-            color: green;
-            font-weight: bold;
-        }
-
-        .gps-inputs input {
-            padding: 8px;
-            margin: 5px;
-            width: 150px;
-        }
-    </style>
 </head>
 
 <body>
 
+<!-- 🌿 NAVBAR -->
 <div class="navbar">
     🌿 WeedVision
     <div>
@@ -66,18 +35,19 @@
 
 <div class="container">
 
-<!-- 🌍 GPS INPUT -->
+<!-- 🌍 GPS -->
 <div class="gps-inputs">
     <input type="number" step="any" name="lat" id="lat" placeholder="Latitude">
     <input type="number" step="any" name="lng" id="lng" placeholder="Longitude">
     <button type="button" onclick="getLocation()">📍 Use My Location</button>
 </div>
 
-<!-- UPLOAD -->
+<!-- 📤 UPLOAD -->
 <form method="POST" enctype="multipart/form-data" id="uploadForm">
 
     <label class="upload-box">
-        📤 Click or Drag Image Here
+        📤 Upload Field Image
+        <p style="opacity:0.7;">Click or drag image here</p>
         <input type="file" name="image" id="fileInput" required>
     </label>
 
@@ -88,57 +58,62 @@
     <p id="loading">Processing image... ⏳</p>
 </form>
 
-<!-- KPI -->
+<!-- 📊 KPI -->
 <div class="cards">
     <div class="card">
-        <h3>Total Weeds</h3>
+        <h3>🌿 Total Weeds</h3>
         <h2>{{ result.weed_count if result else 0 }}</h2>
     </div>
 
     <div class="card">
-        <h3>Status</h3>
+        <h3>📊 Status</h3>
         <h2>{{ result.status if result else "No Data" }}</h2>
     </div>
 
     <div class="card">
-        <h3>Confidence</h3>
+        <h3>🎯 Confidence</h3>
         <h2>{{ result.confidence if result else 0 }}%</h2>
     </div>
 
     <div class="card">
-        <h3>Field Health</h3>
+        <h3>🌱 Field Health</h3>
         <h2>{{ result.health if result else 100 }}%</h2>
     </div>
 
     <div class="card">
-        <h3>Weed Density</h3>
+        <h3>📈 Weed Density</h3>
         <h2>{{ result.density if result else 0 }}%</h2>
     </div>
 </div>
 
-<!-- GRID -->
+<!-- 🧱 GRID -->
 <div class="grid">
 
     <div class="panel">
-       <h3>Field Detection</h3>
+        <h3>Field Detection</h3>
 
-{% if result %}
-    <div style="display:flex; gap:20px;">
-        
-        <div>
-            <p><b>Original</b></p>
-            <img src="{{ result.output }}" style="max-width:300px;">
+        {% if result %}
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+            <div>
+                <p><b>Original</b></p>
+                <img src="{{ input_image }}" style="max-width:300px;">
+            </div>
+
+            <div>
+                <p><b>Detected Weeds</b></p>
+                <img src="{{ result.output }}" style="max-width:300px;">
+            </div>
+
+            <div>
+                <p><b>Mask</b></p>
+                <img src="{{ result.mask }}" style="max-width:300px;">
+            </div>
+
         </div>
-
-        <div>
-            <p><b>Detected Weeds (Mask)</b></p>
-            <img src="{{ result.mask }}" style="max-width:300px;">
-        </div>
-
-    </div>
-{% else %}
-    <p>Upload image to visualize field</p>
-{% endif %}
+        {% else %}
+            <p>Upload image to visualize field</p>
+        {% endif %}
     </div>
 
     <div class="panel feed">
@@ -154,26 +129,19 @@
 
 </div>
 
-<!-- MAP -->
-<div class="panel" style="margin-top:20px;">
+<!-- 🗺 MAP -->
+<div class="panel">
     <h3>Live Field Map</h3>
-    <div id="map" style="height:300px;"></div>
+    <div id="map" style="height:350px;"></div>
 </div>
 
-<!-- DATA -->
-{% if result %}
-<div id="data-holder" data-weed="{{ result.weed_count }}"></div>
-<div id="gps-data" data-lat="{{ result.lat }}" data-lng="{{ result.lng }}"></div>
-{% endif %}
-
-<div id="history-data" data-history='{{ history | tojson | safe }}'></div>
-
-<!-- CHART -->
+<!-- 📊 CHART -->
 <div class="panel">
+    <h3>Weed Trend</h3>
     <canvas id="chart"></canvas>
 </div>
 
-<!-- HISTORY -->
+<!-- 📜 HISTORY -->
 <div class="panel">
     <h3>Detection History</h3>
     {% if history and history|length > 0 %}
@@ -189,6 +157,7 @@
 
 </div>
 
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
@@ -203,7 +172,7 @@ uploadForm.onsubmit = () => {
     loading.style.display = "block";
 };
 
-// 📍 AUTO GPS
+// 📍 GPS
 function getLocation() {
     navigator.geolocation.getCurrentPosition(pos => {
         lat.value = pos.coords.latitude;
@@ -212,18 +181,25 @@ function getLocation() {
 }
 
 // SAFE DATA
-let weedCount = document.getElementById("data-holder")?.dataset.weed || 0;
+let weedCount = parseInt(document.getElementById("data-holder")?.dataset.weed || 0);
 
 let gps = document.getElementById("gps-data");
 let lat = gps ? parseFloat(gps.dataset.lat) : 20.5937;
 let lng = gps ? parseFloat(gps.dataset.lng) : 78.9629;
 
-// 🗺️ REAL MAP
+// MAP
 var map = L.map('map').setView([lat, lng], 15);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 L.marker([lat, lng]).addTo(map).bindPopup("📍 Field Location").openPopup();
+
+// 🌿 FIELD CIRCLE
+L.circle([lat, lng], {
+    radius: 50,
+    color: "#22c55e",
+    fillOpacity: 0.2
+}).addTo(map);
 
 // HEATMAP
 let heatData = [];
@@ -238,19 +214,25 @@ for (let i = 0; i < weedCount; i++) {
 
 L.heatLayer(heatData, {radius: 25}).addTo(map);
 
-// 📊 CHART
+// CHART
 let historyData = JSON.parse(document.getElementById("history-data").dataset.history || "[]");
 
-let weedTrend = historyData.map(h => h.weed_count);
+let weedTrend = historyData.length ? historyData.map(h => h.weed_count) : [0];
 
-new Chart(chart, {
+new Chart(document.getElementById("chart"), {
     type: "line",
     data: {
         labels: weedTrend.map((_, i) => "Run " + (i + 1)),
-        datasets: [{ data: weedTrend }]
+        datasets: [{
+            label: "Weed Count",
+            data: weedTrend,
+            borderColor: "#22c55e",
+            tension: 0.3
+        }]
     }
 });
 
+// REPORT
 function downloadReport() {
     alert("Report generated");
 }
