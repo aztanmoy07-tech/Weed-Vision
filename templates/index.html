@@ -4,38 +4,88 @@
     <title>WeedVision</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-    <!-- Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        .upload-box {
+            border: 2px dashed #4CAF50;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: #f9fff9;
+            cursor: pointer;
+        }
+
+        .upload-box input { display: none; }
+
+        .detect-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: green;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #preview {
+            max-width: 200px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        #loading {
+            display: none;
+            color: green;
+            font-weight: bold;
+        }
+
+        .gps-inputs input {
+            padding: 8px;
+            margin: 5px;
+            width: 150px;
+        }
+    </style>
 </head>
 
 <body>
 
-<!-- NAVBAR -->
 <div class="navbar">
     🌿 WeedVision
-
     <div>
         {% if user %}
             👤 {{ user.name }}
-            <a href="/logout" style="margin-left:10px; color:white;">Logout</a>
+            <a href="/logout">Logout</a>
         {% else %}
-            <a href="/login">
-                <button>Login</button>
-            </a>
+            <a href="/login"><button>Login</button></a>
         {% endif %}
     </div>
 </div>
 
 <div class="container">
 
+<!-- 🌍 GPS INPUT -->
+<div class="gps-inputs">
+    <input type="number" step="any" name="lat" id="lat" placeholder="Latitude">
+    <input type="number" step="any" name="lng" id="lng" placeholder="Longitude">
+    <button type="button" onclick="getLocation()">📍 Use My Location</button>
+</div>
+
 <!-- UPLOAD -->
-<form method="POST" enctype="multipart/form-data">
-    <input type="file" name="image" required>
-    <button type="submit">Detect</button>
+<form method="POST" enctype="multipart/form-data" id="uploadForm">
+
+    <label class="upload-box">
+        📤 Click or Drag Image Here
+        <input type="file" name="image" id="fileInput" required>
+    </label>
+
+    <img id="preview">
+
+    <button type="submit" class="detect-btn">🚀 Detect Weeds</button>
+
+    <p id="loading">Processing image... ⏳</p>
 </form>
 
 <!-- KPI -->
@@ -70,12 +120,25 @@
 <div class="grid">
 
     <div class="panel">
-        <h3>Field Detection</h3>
-        {% if result %}
-            <img src="{{ result.output }}">
-        {% else %}
-            <p>Upload image to visualize field</p>
-        {% endif %}
+       <h3>Field Detection</h3>
+
+{% if result %}
+    <div style="display:flex; gap:20px;">
+        
+        <div>
+            <p><b>Original</b></p>
+            <img src="{{ result.output }}" style="max-width:300px;">
+        </div>
+
+        <div>
+            <p><b>Detected Weeds (Mask)</b></p>
+            <img src="{{ result.mask }}" style="max-width:300px;">
+        </div>
+
+    </div>
+{% else %}
+    <p>Upload image to visualize field</p>
+{% endif %}
     </div>
 
     <div class="panel feed">
@@ -97,16 +160,16 @@
     <div id="map" style="height:300px;"></div>
 </div>
 
-<!-- DATA HOLDER -->
+<!-- DATA -->
 {% if result %}
 <div id="data-holder" data-weed="{{ result.weed_count }}"></div>
+<div id="gps-data" data-lat="{{ result.lat }}" data-lng="{{ result.lng }}"></div>
 {% endif %}
 
-<!-- SAFE HISTORY HOLDER -->
 <div id="history-data" data-history='{{ history | tojson | safe }}'></div>
 
 <!-- CHART -->
-<div class="panel" style="margin-top:20px;">
+<div class="panel">
     <canvas id="chart"></canvas>
 </div>
 
@@ -126,77 +189,71 @@
 
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
+// 📤 PREVIEW
+fileInput.onchange = e => {
+    preview.src = URL.createObjectURL(e.target.files[0]);
+    preview.style.display = "block";
+};
+
+// ⏳ LOADING
+uploadForm.onsubmit = () => {
+    loading.style.display = "block";
+};
+
+// 📍 AUTO GPS
+function getLocation() {
+    navigator.geolocation.getCurrentPosition(pos => {
+        lat.value = pos.coords.latitude;
+        lng.value = pos.coords.longitude;
+    });
+}
+
 // SAFE DATA
-let weedCount = 0;
-const dataElement = document.getElementById("data-holder");
+let weedCount = document.getElementById("data-holder")?.dataset.weed || 0;
 
-if (dataElement) {
-    weedCount = parseInt(dataElement.dataset.weed);
-}
+let gps = document.getElementById("gps-data");
+let lat = gps ? parseFloat(gps.dataset.lat) : 20.5937;
+let lng = gps ? parseFloat(gps.dataset.lng) : 78.9629;
 
-// SAFE HISTORY PARSE
-let historyData = [];
-const historyElement = document.getElementById("history-data");
-
-if (historyElement) {
-    try {
-        historyData = JSON.parse(historyElement.dataset.history);
-    } catch (e) {
-        console.log("History parse error", e);
-        historyData = [];
-    }
-}
-
-// ---------------- MAP ----------------
-var map = L.map('map').setView([20.5937, 78.9629], 5);
+// 🗺️ REAL MAP
+var map = L.map('map').setView([lat, lng], 15);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+L.marker([lat, lng]).addTo(map).bindPopup("📍 Field Location").openPopup();
 
 // HEATMAP
 let heatData = [];
 
 for (let i = 0; i < weedCount; i++) {
     heatData.push([
-        20.5 + (Math.random() - 0.5) * 0.5,
-        78.9 + (Math.random() - 0.5) * 0.5,
+        lat + (Math.random() - 0.5) * 0.002,
+        lng + (Math.random() - 0.5) * 0.002,
         1
     ]);
 }
 
 L.heatLayer(heatData, {radius: 25}).addTo(map);
 
-// ---------------- CHART ----------------
-const weedTrend = historyData.length
-    ? historyData.map(h => h.weed_count)
-    : [0];
+// 📊 CHART
+let historyData = JSON.parse(document.getElementById("history-data").dataset.history || "[]");
 
-new Chart(document.getElementById("chart"), {
+let weedTrend = historyData.map(h => h.weed_count);
+
+new Chart(chart, {
     type: "line",
     data: {
         labels: weedTrend.map((_, i) => "Run " + (i + 1)),
-        datasets: [{
-            label: "Weed Trend",
-            data: weedTrend,
-            borderWidth: 2,
-            fill: false
-        }]
+        datasets: [{ data: weedTrend }]
     }
 });
 
-// ---------------- REPORT ----------------
 function downloadReport() {
-    alert("Report generated (demo)");
+    alert("Report generated");
 }
-
-// ---------------- AUTO LOG ----------------
-setInterval(() => {
-    console.log("System monitoring...");
-}, 5000);
-
 </script>
 
 </body>
