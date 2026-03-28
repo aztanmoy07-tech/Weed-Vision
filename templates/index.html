@@ -3,7 +3,13 @@
 <head>
     <title>WeedVision</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 
 <body>
@@ -18,59 +24,180 @@
             <a href="/logout" style="margin-left:10px; color:white;">Logout</a>
         {% else %}
             <a href="/login">
-                <button style="padding:6px 10px;">Login</button>
+                <button>Login</button>
             </a>
         {% endif %}
     </div>
 </div>
 
-<!-- UPLOAD FORM -->
 <div class="container">
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="image" required>
-        <button type="submit">Detect</button>
-    </form>
+
+<!-- UPLOAD -->
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" required>
+    <button type="submit">Detect</button>
+</form>
+
+<!-- KPI -->
+<div class="cards">
+    <div class="card">
+        <h3>Total Weeds</h3>
+        <h2>{{ result.weed_count if result else 0 }}</h2>
+    </div>
+
+    <div class="card">
+        <h3>Status</h3>
+        <h2>{{ result.status if result else "No Data" }}</h2>
+    </div>
+
+    <div class="card">
+        <h3>Confidence</h3>
+        <h2>{{ result.confidence if result else 0 }}%</h2>
+    </div>
+
+    <div class="card">
+        <h3>Field Health</h3>
+        <h2>{{ result.health if result else 100 }}%</h2>
+    </div>
+
+    <div class="card">
+        <h3>Weed Density</h3>
+        <h2>{{ result.density if result else 0 }}%</h2>
+    </div>
 </div>
 
+<!-- GRID -->
+<div class="grid">
+
+    <div class="panel">
+        <h3>Field Detection</h3>
+        {% if result %}
+            <img src="{{ result.output }}">
+        {% else %}
+            <p>Upload image to visualize field</p>
+        {% endif %}
+    </div>
+
+    <div class="panel feed">
+        <h3>Event Feed</h3>
+        {% if result %}
+            <p>✔ Weed clusters detected</p>
+            <p>✔ Status: {{ result.status }}</p>
+            <p>✔ Recommendation: {{ result.recommendation }}</p>
+        {% else %}
+            <p>No activity yet</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- MAP -->
+<div class="panel" style="margin-top:20px;">
+    <h3>Live Field Map</h3>
+    <div id="map" style="height:300px;"></div>
+</div>
+
+<!-- DATA HOLDER -->
 {% if result %}
+<div id="data-holder" data-weed="{{ result.weed_count }}"></div>
+{% endif %}
 
-<!-- IMAGE DISPLAY -->
-<div class="images">
-    <div>
-        <h3>Input</h3>
-        <img src="{{ input_image }}" alt="Input Image">
-    </div>
-
-    <div>
-        <h3>Output</h3>
-        <img src="{{ result.output }}" alt="Output Image">
-    </div>
-</div>
-
-<!-- DASHBOARD -->
-<div class="dashboard">
-    <div class="card">
-        <h3>🌿 Weed Count</h3>
-        <p>{{ result.weed_count }}</p>
-    </div>
-
-    <div class="card">
-        <h3>🎯 Confidence</h3>
-        <p>{{ result.confidence }}%</p>
-    </div>
-
-    <div class="card">
-        <h3>📊 Status</h3>
-        <p>{{ result.status }}</p>
-    </div>
-</div>
+<!-- SAFE HISTORY HOLDER -->
+<div id="history-data" data-history='{{ history | tojson | safe }}'></div>
 
 <!-- CHART -->
-return render_template(
-    "index.html",
-    result=result,
-    input_image=input_image,
-    user=session.get("user")
-)
+<div class="panel" style="margin-top:20px;">
+    <canvas id="chart"></canvas>
+</div>
+
+<!-- HISTORY -->
+<div class="panel">
+    <h3>Detection History</h3>
+    {% if history and history|length > 0 %}
+        {% for h in history[-5:] %}
+            <p>Weeds: {{ h.weed_count }} | Status: {{ h.status }}</p>
+        {% endfor %}
+    {% else %}
+        <p>No history yet</p>
+    {% endif %}
+</div>
+
+<button onclick="downloadReport()">Download Report</button>
+
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+// SAFE DATA
+let weedCount = 0;
+const dataElement = document.getElementById("data-holder");
+
+if (dataElement) {
+    weedCount = parseInt(dataElement.dataset.weed);
+}
+
+// SAFE HISTORY PARSE
+let historyData = [];
+const historyElement = document.getElementById("history-data");
+
+if (historyElement) {
+    try {
+        historyData = JSON.parse(historyElement.dataset.history);
+    } catch (e) {
+        console.log("History parse error", e);
+        historyData = [];
+    }
+}
+
+// ---------------- MAP ----------------
+var map = L.map('map').setView([20.5937, 78.9629], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+// HEATMAP
+let heatData = [];
+
+for (let i = 0; i < weedCount; i++) {
+    heatData.push([
+        20.5 + (Math.random() - 0.5) * 0.5,
+        78.9 + (Math.random() - 0.5) * 0.5,
+        1
+    ]);
+}
+
+L.heatLayer(heatData, {radius: 25}).addTo(map);
+
+// ---------------- CHART ----------------
+const weedTrend = historyData.length
+    ? historyData.map(h => h.weed_count)
+    : [0];
+
+new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+        labels: weedTrend.map((_, i) => "Run " + (i + 1)),
+        datasets: [{
+            label: "Weed Trend",
+            data: weedTrend,
+            borderWidth: 2,
+            fill: false
+        }]
+    }
+});
+
+// ---------------- REPORT ----------------
+function downloadReport() {
+    alert("Report generated (demo)");
+}
+
+// ---------------- AUTO LOG ----------------
+setInterval(() => {
+    console.log("System monitoring...");
+}, 5000);
+
+</script>
+
 </body>
 </html>

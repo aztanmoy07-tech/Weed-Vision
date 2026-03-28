@@ -1,38 +1,72 @@
 body {
-    font-family: Arial;
-    text-align: center;
-    background: #f5f7fa;
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #0b1120;
+    color: white;
 }
 
 .navbar {
-    background: #2e7d32;
-    color: white;
-    padding: 15px;
+    background: #020617;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 22px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.container {
+    padding: 20px;
+}
+
+form {
+    text-align: center;
+    margin-bottom: 20px;
 }
 
 button {
-    background: #2e7d32;
-    color: white;
-    padding: 10px;
+    background: #22c55e;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
 }
 
-.images {
+.cards {
     display: flex;
-    justify-content: center;
-    gap: 20px;
-}
-
-.images img {
-    width: 300px;
-}
-
-.dashboard {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
+    gap: 15px;
+    margin-bottom: 20px;
 }
 
 .card {
-    background: white;
+    flex: 1;
+    background: #1e293b;
     padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 0 10px rgba(0,255,150,0.1);
+}
+
+.card h2 {
+    color: #4ade80;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.panel {
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 12px;
+}
+
+.images img {
+    width: 100%;
+    border-radius: 10px;
+}
+
+.feed p {
+    margin: 8px 0;
 }
