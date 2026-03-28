@@ -15,7 +15,6 @@
     <!-- Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
 </head>
 
 <body>
@@ -37,8 +36,8 @@
 
 <!-- 🌍 GPS -->
 <div class="gps-inputs">
-    <input type="number" step="any" name="lat" id="lat" placeholder="Latitude">
-    <input type="number" step="any" name="lng" id="lng" placeholder="Longitude">
+    <input type="number" step="any" id="lat" placeholder="Latitude">
+    <input type="number" step="any" id="lng" placeholder="Longitude">
     <button type="button" onclick="getLocation()">📍 Use My Location</button>
 </div>
 
@@ -47,15 +46,20 @@
 
     <label class="upload-box">
         📤 Upload Field Image
-        <p style="opacity:0.7;">Click or drag image here</p>
+        <p>Click or drag image here</p>
         <input type="file" name="image" id="fileInput" required>
     </label>
 
-    <img id="preview">
+    <img id="preview" style="display:none; max-width:200px; margin-top:10px;">
 
     <button type="submit" class="detect-btn">🚀 Detect Weeds</button>
 
-    <p id="loading">Processing image... ⏳</p>
+    <!-- ✅ PREMIUM LOADER -->
+    <div id="loader" class="loader hidden">
+        <div class="spinner"></div>
+        <p>🌿 Analyzing field...</p>
+    </div>
+
 </form>
 
 <!-- 📊 KPI -->
@@ -101,7 +105,7 @@
             </div>
 
             <div>
-                <p><b>Detected Weeds</b></p>
+                <p><b>Detected</b></p>
                 <img src="{{ result.output }}" style="max-width:300px;">
             </div>
 
@@ -144,7 +148,7 @@
 <!-- 📜 HISTORY -->
 <div class="panel">
     <h3>Detection History</h3>
-    {% if history and history|length > 0 %}
+    {% if history %}
         {% for h in history[-5:] %}
             <p>Weeds: {{ h.weed_count }} | Status: {{ h.status }}</p>
         {% endfor %}
@@ -153,7 +157,12 @@
     {% endif %}
 </div>
 
-<button onclick="downloadReport()">Download Report</button>
+<!-- ✅ SAFE DATA -->
+<div id="data-holder" data-weed="{{ result.weed_count if result else 0 }}"></div>
+<div id="gps-data"
+     data-lat="{{ result.lat if result else 20.5937 }}"
+     data-lng="{{ result.lng if result else 78.9629 }}"></div>
+<div id="history-data" data-history='{{ history | tojson | safe }}'></div>
 
 </div>
 
@@ -161,31 +170,32 @@
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
-// 📤 PREVIEW
+
+// PREVIEW
 fileInput.onchange = e => {
     preview.src = URL.createObjectURL(e.target.files[0]);
     preview.style.display = "block";
 };
 
-// ⏳ LOADING
+// LOADER
 uploadForm.onsubmit = () => {
-    loading.style.display = "block";
+    document.getElementById("loader").classList.remove("hidden");
 };
 
-// 📍 GPS
+// GPS
 function getLocation() {
     navigator.geolocation.getCurrentPosition(pos => {
-        lat.value = pos.coords.latitude;
-        lng.value = pos.coords.longitude;
+        document.getElementById("lat").value = pos.coords.latitude;
+        document.getElementById("lng").value = pos.coords.longitude;
     });
 }
 
-// SAFE DATA
-let weedCount = parseInt(document.getElementById("data-holder")?.dataset.weed || 0);
-
+// DATA
+let weedCount = parseInt(document.getElementById("data-holder").dataset.weed);
 let gps = document.getElementById("gps-data");
-let lat = gps ? parseFloat(gps.dataset.lat) : 20.5937;
-let lng = gps ? parseFloat(gps.dataset.lng) : 78.9629;
+
+let lat = parseFloat(gps.dataset.lat);
+let lng = parseFloat(gps.dataset.lng);
 
 // MAP
 var map = L.map('map').setView([lat, lng], 15);
@@ -194,7 +204,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 L.marker([lat, lng]).addTo(map).bindPopup("📍 Field Location").openPopup();
 
-// 🌿 FIELD CIRCLE
 L.circle([lat, lng], {
     radius: 50,
     color: "#22c55e",
@@ -215,7 +224,7 @@ for (let i = 0; i < weedCount; i++) {
 L.heatLayer(heatData, {radius: 25}).addTo(map);
 
 // CHART
-let historyData = JSON.parse(document.getElementById("history-data").dataset.history || "[]");
+let historyData = JSON.parse(document.getElementById("history-data").dataset.history);
 
 let weedTrend = historyData.length ? historyData.map(h => h.weed_count) : [0];
 
@@ -232,10 +241,6 @@ new Chart(document.getElementById("chart"), {
     }
 });
 
-// REPORT
-function downloadReport() {
-    alert("Report generated");
-}
 </script>
 
 </body>
